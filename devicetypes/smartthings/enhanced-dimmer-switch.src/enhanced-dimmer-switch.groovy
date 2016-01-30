@@ -21,7 +21,8 @@ metadata {
 		capability "Polling"
 		capability "Refresh"
 		capability "Sensor"
-        
+        capability "Configuration"
+
         command "fixRampRate"
 
 		fingerprint inClusters: "0x26"
@@ -66,6 +67,9 @@ metadata {
 		standardTile("refresh", "device.switch", height: 2, width: 2, inactiveLabel: false, decoration: "flat") {
 			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
+		standardTile("configure","device.configure", decoration: "flat", width: 2, height: 2) {
+			state "configure", label:'config', action:"configure", icon:"st.secondary.tools"
+		}
         standardTile("rampRate", "device.switch", height: 2, width: 2, inactiveLabel: false, decoration: "flat") {
         	state "default", label:"Fix Ramp Rate", action:"fixRampRate"
         }
@@ -73,9 +77,52 @@ metadata {
 		main(["switch"])
 		details(["switch", "refresh", "indicator", "rampRate"])
 	}
+    
+    preferences {
+		input "debugOutput", 
+        	"boolean", 
+			title: "Enable debug logging?",
+			defaultValue: false,
+			displayDuringSetup: true
+		input "rampStepSize",
+			"number",
+			title: "Button ramp step size",
+            description: "percentage of each step",
+            range: "1..99",
+			defaultValue: 1,
+            required: false,
+            displayDuringSetup: false
+		input "rampTimePerStep",
+        	"number",
+            title: "Button ramp time per step",
+            description: "number of ms per step",
+			range: "1..255",
+			defaultValue: 3,
+			required: false,
+            displayDuringSetup: false
+		input "invertSwitch",
+        	"boolean",
+            title: "Invert switch",
+            description: "invert the switch sense",
+			defaultValue: false,
+			required: false,
+            displayDuringSetup: false
+	}
+}
+
+def updated()
+{
+	state.debug = ("true" == debugOutput)
+// DCT TODO -- do I need to track if the configuration completed?    
+//	if (!isConfigured()) {
+		// in case we miss the SCSR
+		response(configure())
+//	}
 }
 
 def parse(String description) {
+    if (state.debug) log.debug("parse description: $description")
+
 	def item1 = [
 		canBeCurrentState: false,
 		linkText: getLinkText(device),
@@ -226,16 +273,40 @@ def fixRampRate() {
     delayBetween([
       //  zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 7, size: 1).format(),
       //  zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 8, size: 1).format(),
-        zwave.configurationV1.configurationSet(configurationValue: [10], parameterNumber: 9, size: 1).format(),
+        zwave.configurationV1.configurationSet(configurationValue: [3], parameterNumber: 9, size: 1).format(),
         zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 10, size: 1).format()
     ], 500)
 }
 
 def invertSwitch(invert=true) {
-	if (invert) {
+    if (state.debug) log.debug("Setting switch sense to $invert")
+
+	if (invert==true) {
+    	if (state.debug) log.debug("Setting switch sense INVERTED")
 		zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
 	}
 	else {
+	    if (state.debug) log.debug("Setting switch sense NORMAL")
 		zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
 	}
+}
+
+def configure() {
+	if (state.debug) {
+	    // Can I get the device name to log here?
+    	log.debug "--Sending configuration command to Switch--"
+    	log.debug "Preferences settings: RampStepSize: $rampStepSize, RampStepTime: $rampTimePerStep, invertSwitch: $invertSwitch"
+    }
+    
+    if (state.debug) log.debug("Setting ramp rate")
+    delayBetween([
+    // todo allow thse to be configured too?
+//        zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 7, size: 1).format(),
+//        zwave.configurationV1.configurationSet(configurationValue: [3], parameterNumber: 8, size: 1).format(),
+        zwave.configurationV1.configurationSet(configurationValue: [rampStepSize], parameterNumber: 9, size: 1).format(),
+        zwave.configurationV1.configurationSet(configurationValue: [rampTimePerStep], parameterNumber: 10, size: 1).format()
+    ], 500)
+
+    if (state.debug) log.debug("Setting switch sense")
+	invertSwitch(invertSwitch)
 }
