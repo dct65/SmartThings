@@ -95,7 +95,7 @@ metadata {
 		input "rampTimePerStep",
         	"number",
             title: "Button ramp time per step",
-            description: "number of ms per step",
+            description: "number of 10ms per step",
 			range: "1..255",
 			defaultValue: 3,
 			required: false,
@@ -225,11 +225,16 @@ def createEvent(physicalgraph.zwave.Command cmd,  Map map) {
 
 def on() {
 	log.info "on"
-	delayBetween([zwave.basicV1.basicSet(value: 0xFF).format(), zwave.switchMultilevelV1.switchMultilevelGet().format()], 5000)
+	delayBetween([
+    	zwave.basicV1.basicSet(value: 0xFF).format(), 
+    	zwave.switchMultilevelV1.switchMultilevelGet().format()], 5000)
 }
 
 def off() {
-	delayBetween ([zwave.basicV1.basicSet(value: 0x00).format(), zwave.switchMultilevelV1.switchMultilevelGet().format()], 5000)
+	log.info "off"
+	delayBetween ([
+    	zwave.basicV1.basicSet(value: 0x00).format(), 
+        zwave.switchMultilevelV1.switchMultilevelGet().format()], 5000)
 }
 
 def setLevel(value) {
@@ -269,7 +274,7 @@ def indicatorNever() {
 }
 
 def fixRampRate() {
-	log.debug("Fixing ramp rate")
+	log.debug("Resetting ramp rate")
     delayBetween([
       //  zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 7, size: 1).format(),
       //  zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 8, size: 1).format(),
@@ -281,7 +286,7 @@ def fixRampRate() {
 def invertSwitch(invert=true) {
     if (state.debug) log.debug("Setting switch sense to $invert")
 
-	if (invert==true) {
+	if (invert) {
     	if (state.debug) log.debug("Setting switch sense INVERTED")
 		zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
 	}
@@ -308,5 +313,5 @@ def configure() {
     ], 500)
 
     if (state.debug) log.debug("Setting switch sense")
-	invertSwitch(invertSwitch)
+	invertSwitch(invertSwitch == "true");
 }
