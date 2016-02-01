@@ -211,7 +211,13 @@ def doCreateEvent(physicalgraph.zwave.Command cmd, Map item1) {
 	result
 }
 
+def zwaveEvent(physicalgraph.zwave.commands.configurationv2.ConfigurationReport cmd) {
+    if (state.debug) log.debug "---CONFIGURATION REPORT V2--- ${device.displayName} parameter ${cmd.parameterNumber} with a byte size of ${cmd.size} is set to ${cmd.configurationValue}"
+}
+
 def zwaveEvent(physicalgraph.zwave.commands.configurationv1.ConfigurationReport cmd) {
+    if (state.debug) log.debug "---CONFIGURATION REPORT V1--- ${device.displayName} parameter ${cmd.parameterNumber} with a byte size of ${cmd.size} is set to ${cmd.configurationValue}"
+
 	def value = "when off"
 	if (cmd.configurationValue[0] == 1) {value = "when on"}
 	if (cmd.configurationValue[0] == 2) {value = "never"}
@@ -255,7 +261,22 @@ def poll() {
 }
 
 def refresh() {
-	zwave.switchMultilevelV1.switchMultilevelGet().format()
+	if (state.debug) {
+		log.debug("Attempting to get configuration values...")
+	    delayBetween([
+			zwave.switchMultilevelV1.switchMultilevelGet().format(),
+//		 	zwave.configurationV2.configurationBulkGet(numberOfParameters: 13, parameterOffset: 0x0).format()
+			zwave.configurationV1.configurationGet(parameterNumber: 11).format(),
+			zwave.configurationV1.configurationGet(parameterNumber: 12).format(),
+			zwave.configurationV1.configurationGet(parameterNumber: 13).format(),
+			zwave.configurationV1.configurationGet(parameterNumber: 7).format(),
+			zwave.configurationV1.configurationGet(parameterNumber: 8).format(),
+			zwave.configurationV1.configurationGet(parameterNumber: 9).format(),
+			zwave.configurationV1.configurationGet(parameterNumber: 10).format()
+	    ], 500)
+   } else {
+		zwave.switchMultilevelV1.switchMultilevelGet().format()
+   }
 }
 
 def indicatorWhenOn() {
@@ -278,8 +299,8 @@ def fixRampRate() {
     delayBetween([
       //  zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 7, size: 1).format(),
       //  zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 8, size: 1).format(),
-        zwave.configurationV1.configurationSet(configurationValue: [3], parameterNumber: 9, size: 1).format(),
-        zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 10, size: 1).format()
+        zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 9, size: 1).format(),
+        zwave.configurationV1.configurationSet(configurationValue: [3], parameterNumber: 10, size: 1).format()
     ], 500)
 }
 
@@ -288,11 +309,11 @@ def invertSwitch(invert=true) {
 
 	if (invert) {
     	if (state.debug) log.debug("Setting switch sense INVERTED")
-		zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
+		return zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1)
 	}
 	else {
 	    if (state.debug) log.debug("Setting switch sense NORMAL")
-		zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
+		return zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1)
 	}
 }
 
@@ -309,9 +330,16 @@ def configure() {
 //        zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 7, size: 1).format(),
 //        zwave.configurationV1.configurationSet(configurationValue: [3], parameterNumber: 8, size: 1).format(),
         zwave.configurationV1.configurationSet(configurationValue: [rampStepSize], parameterNumber: 9, size: 1).format(),
-        zwave.configurationV1.configurationSet(configurationValue: [rampTimePerStep], parameterNumber: 10, size: 1).format()
+        zwave.configurationV1.configurationSet(configurationValue: [rampTimePerStep], parameterNumber: 10, size: 1).format(),
+        invertSwitch(invertSwitch == "true").format()
     ], 500)
 
-    if (state.debug) log.debug("Setting switch sense")
-	invertSwitch(invertSwitch == "true");
+//    if (state.debug) log.debug("Setting switch sense")
+//	invertSwitch(invertSwitch == "true");
 }
+
+/*
+	State -> On: Set button ramp to slower setting
+    State -> Off: Set button ramp to fast setting; allow fast turn on
+*/
+
